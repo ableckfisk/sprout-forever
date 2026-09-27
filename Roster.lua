@@ -26,10 +26,10 @@ function Roster.SplitKey(key)
 	return name, realm
 end
 
--- Inserts or refreshes an entry. Returns true when something visible changed
--- (new player, or a presence field differs), so callers can skip UI
--- refreshes for routine heartbeats.
-function Roster:Upsert(key, presence, now)
+-- Inserts or refreshes an entry, keeping it alive for `ttl` seconds. Returns
+-- true when something visible changed (new player, or a presence field
+-- differs), so callers can skip UI refreshes for routine heartbeats.
+function Roster:Upsert(key, presence, now, ttl)
 	local entry = self.entries[key]
 	local changed = false
 
@@ -49,6 +49,7 @@ function Roster:Upsert(key, presence, now)
 	end
 
 	entry.lastSeen = now
+	entry.expiresAt = now + (ttl or 0)
 
 	return changed
 end
@@ -67,12 +68,12 @@ function Roster:Get(key)
 	return self.entries[key]
 end
 
--- Drops entries not seen since `cutoff`. Returns the number removed.
-function Roster:ExpireOlderThan(cutoff)
+-- Drops entries whose time-to-live has passed. Returns the number removed.
+function Roster:Expire(now)
 	local removed = 0
 
 	for key, entry in pairs(self.entries) do
-		if entry.lastSeen < cutoff then
+		if entry.expiresAt <= now then
 			self.entries[key] = nil
 			removed = removed + 1
 		end
@@ -115,13 +116,25 @@ local SORTERS = {
 	end,
 }
 
+-- Case-insensitive plain-text match against name, zone, class and note.
+local function matchesFilter(entry, filter)
+	if not filter or filter == "" then
+		return true
+	end
+
+	local haystack = (entry.key .. " " .. (entry.zone or "") .. " " .. (entry.class or "") .. " " .. (entry.note or "")):lower()
+
+	return haystack:find(filter, 1, true) ~= nil
+end
+
 -- Returns an array of entries with the given role, sorted by `sortKey`
--- ("name", "level" or "zone").
-function Roster:GetByRole(role, sortKey)
+-- ("name", "level" or "zone") and optionally narrowed by a filter string.
+function Roster:GetByRole(role, sortKey, filter)
 	local result = {}
+	local normalizedFilter = filter and filter:lower():gsub("^%s+", ""):gsub("%s+$", "") or ""
 
 	for _, entry in pairs(self.entries) do
-		if entry.role == role then
+		if entry.role == role and matchesFilter(entry, normalizedFilter) then
 			result[#result + 1] = entry
 		end
 	end

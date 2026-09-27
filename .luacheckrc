@@ -21,6 +21,7 @@ read_globals = {
   "InviteUnit", "ChatFrame_OpenChat", "ChatFrame_SendTell", "ChatFrame_AddMessageEventFilter",
   "ChatFrame_RemoveChannel", "DEFAULT_CHAT_FRAME", "GameTooltip",
   "RAID_CLASS_COLORS", "LOCALIZED_CLASS_NAMES_MALE", "NORMAL_FONT_COLOR",
+  "CreateFrame", "UIParent",
   "hooksecurefunc", "strsplit", "strtrim", "wipe", "tinsert", "tremove",
   "date", "time",
 }

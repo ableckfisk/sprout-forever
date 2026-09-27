@@ -20,11 +20,25 @@ ns.Constants = {
 	CHANNEL_PASSWORD = "sproutfvr2026",
 
 	-- Presence timings (seconds).
+	--
+	-- The heartbeat interval stretches with the size of the roster so total
+	-- channel traffic stays roughly flat as a cluster fills up: base interval
+	-- times (1 + rosterCount / HEARTBEAT_SCALE_STEP), capped at the maximum.
+	-- Every heartbeat carries its sender's interval so receivers expire each
+	-- entry on the sender's schedule, not ours.
 	HEARTBEAT_INTERVAL = 120,
+	HEARTBEAT_INTERVAL_MAX = 600,
+	HEARTBEAT_SCALE_STEP = 250,
 	MISSED_HEARTBEATS_BEFORE_EXPIRY = 3,
 	ROSTER_SWEEP_INTERVAL = 30,
-	HERE_REPLY_MAX_JITTER = 2,
+
+	-- WHO_ONLINE is only useful while our roster is younger than one base
+	-- heartbeat interval; after that heartbeats have filled it. Replies are
+	-- spread over a wide jitter window and coalesced, so a burst of logins
+	-- costs the cluster one reply per player per window, not per request.
+	WHO_ONLINE_WINDOW = 120,
 	WHO_ONLINE_COOLDOWN = 10,
+	HERE_REPLY_MAX_JITTER = 10,
 	PRESENCE_CHANGE_DEBOUNCE = 1,
 
 	-- Channel join behaviour (seconds / attempts).
@@ -67,5 +81,21 @@ ns.Constants = {
 	},
 }
 
-ns.Constants.ROSTER_EXPIRY = ns.Constants.HEARTBEAT_INTERVAL * ns.Constants.MISSED_HEARTBEATS_BEFORE_EXPIRY
-	+ ns.Constants.ROSTER_SWEEP_INTERVAL
+-- Time-to-live for a roster entry whose sender heartbeats every `interval`.
+-- The interval comes off the wire, so it is clamped to the range a genuine
+-- client can produce: a bogus value can neither pin an entry forever nor
+-- expire it before the next beat.
+function ns.Constants.RosterTtl(interval)
+	local C = ns.Constants
+	local clamped = math.max(C.HEARTBEAT_INTERVAL, math.min(interval or C.HEARTBEAT_INTERVAL, C.HEARTBEAT_INTERVAL_MAX))
+
+	return clamped * C.MISSED_HEARTBEATS_BEFORE_EXPIRY + C.ROSTER_SWEEP_INTERVAL
+end
+
+-- Heartbeat interval to use given how many players we currently see.
+function ns.Constants.HeartbeatIntervalFor(rosterCount)
+	local C = ns.Constants
+	local steps = math.floor((rosterCount or 0) / C.HEARTBEAT_SCALE_STEP)
+
+	return math.min(C.HEARTBEAT_INTERVAL_MAX, C.HEARTBEAT_INTERVAL * (1 + steps))
+end

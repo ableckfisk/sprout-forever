@@ -36,16 +36,31 @@ connected-realm cluster and faction, not the whole game.
 - Presence is exchanged with addon messages over that channel using a
   registered prefix. Messages are `version;TYPE;key=value;...` strings, so
   fields can be added later without breaking older clients.
-- Every 2 minutes each active player broadcasts a heartbeat (`HB`) with role,
-  level, class, zone and note. Opening the window sends `WHO`; active peers
-  reply `HERE` after a 0-2 s random delay. `BYE` is sent when switching to Off
+- Each active player broadcasts a heartbeat (`HB`) with role, level, class,
+  zone, note and its own heartbeat interval. The interval starts at 2 minutes
+  and stretches as the roster grows (up to 10 minutes) so per-client traffic
+  stays roughly flat on crowded clusters. `BYE` is sent when switching to Off
   and, best effort, on logout.
-- Roster entries expire after 3 missed heartbeats. The roster is in memory
-  only and rebuilt every session.
+- Roster entries expire after 3 missed heartbeats of the sender's own
+  interval. The roster is in memory only and rebuilt every session.
+- `WHO` is sent on joining the channel and, for the first 2 minutes after
+  that, when the window is opened or refreshed. Beyond that heartbeats have
+  already filled the roster and `WHO` is not sent. Active peers answer `HERE`
+  after a 0-10 s random delay; requests arriving while a reply is pending
+  share that one reply, so bursts of logins do not multiply traffic.
 - Characters set to Off still join the channel and can browse, but never
   announce themselves or answer `WHO`.
 - Sending goes through AceComm and ChatThrottleLib, which paces traffic and
   re-queues messages the client rejects with the addon-message throttle.
+
+## Performance notes
+
+Nothing runs per frame; all work is event or timer driven. Per client, a
+heartbeat costs a few string matches and one small table, and roster memory
+is a few hundred bytes per player. The roster window keeps a fixed pool of
+row frames (only as many as fit on screen) and rebinds them to the visible
+slice of the sorted roster, so drawing cost does not grow with population.
+While open it redraws at most once per second on roster changes.
 
 ## Layout
 
@@ -60,7 +75,7 @@ Player.lua         live character info (name-realm, level, class, zone)
 Channel.lua        hidden channel join/rejoin/health check
 Comm.lua           heartbeat, WHO/HERE/BYE, roster expiry
 Options.lua        AceConfig settings panel
-UI/RosterWindow.lua  two-box AceGUI roster window
+UI/RosterWindow.lua  two-box roster window (AceGUI chrome, virtualized row lists)
 UI/NoteDialog.lua    private note editor
 libs/              Ace3 (gitignored, see below)
 tests/             pure-Lua tests: lua tests/run.lua

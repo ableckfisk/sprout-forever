@@ -4,8 +4,15 @@
 -- Sending goes through AceComm, which wraps C_ChatInfo.SendAddonMessage in
 -- ChatThrottleLib. ChatThrottleLib paces output and, when the client reports
 -- the per-prefix throttle (10 messages, refilling 1/s), parks the queue and
--- retries instead of dropping. This module only adds coalescing on top so a
--- burst of WHO_ONLINE requests never queues more than one reply.
+-- retries instead of dropping.
+--
+-- Scaling rules (see Constants for the numbers):
+--   * Heartbeat interval grows with roster size, so per-client traffic stays
+--     roughly flat however many players share the channel.
+--   * WHO_ONLINE is only sent while our roster is young; afterwards it adds
+--     nothing that heartbeats do not already deliver.
+--   * HERE replies are jittered over a wide window and coalesced, so any
+--     number of WHO_ONLINE requests inside that window cost one reply.
 local _, ns = ...
 
 local Sprout = ns.addon
@@ -25,6 +32,7 @@ function Comm:OnInitialize()
 	self.pendingHereReply = nil
 	self.pendingPresenceChange = nil
 	self.lastWhoOnlineAt = 0
+	self.channelJoinedAt = nil
 end
 
 function Comm:OnEnable()
@@ -43,21 +51,33 @@ end
 -- Lifecycle ------------------------------------------------------------------
 
 function Comm:OnChannelJoined()
-	self:StartHeartbeat()
+	self.channelJoinedAt = GetTime()
+	self:ScheduleNextHeartbeat()
 	self:RequestRoster(true)
 	self:SendHeartbeat()
 end
 
 function Comm:OnChannelLeft()
+	self.channelJoinedAt = nil
 	self:StopHeartbeat()
 end
 
-function Comm:StartHeartbeat()
-	if self.heartbeatTimer then
-		return
-	end
+-- Current interval, derived from how many players we see right now.
+function Comm:GetHeartbeatInterval()
+	return Constants.HeartbeatIntervalFor(Sprout.roster:Count())
+end
 
-	self.heartbeatTimer = self:ScheduleRepeatingTimer("SendHeartbeat", Constants.HEARTBEAT_INTERVAL)
+-- One-shot timer that reschedules itself, so the interval can change between
+-- beats as the roster grows or shrinks.
+function Comm:ScheduleNextHeartbeat()
+	self:StopHeartbeat()
+	self.heartbeatTimer = self:ScheduleTimer("OnHeartbeatTick", self:GetHeartbeatInterval())
+end
+
+function Comm:OnHeartbeatTick()
+	self.heartbeatTimer = nil
+	self:SendHeartbeat()
+	self:ScheduleNextHeartbeat()
 end
 
 function Comm:StopHeartbeat()
@@ -140,7 +160,9 @@ function Comm:SendHeartbeat()
 		return
 	end
 
-	self:Send(MESSAGE_TYPES.HEARTBEAT, Protocol.EncodePresence(MESSAGE_TYPES.HEARTBEAT, Player.GetPresence()), "BULK")
+	local presence = Player.GetPresence(self:GetHeartbeatInterval())
+
+	self:Send(MESSAGE_TYPES.HEARTBEAT, Protocol.EncodePresence(MESSAGE_TYPES.HEARTBEAT, presence), "BULK")
 end
 
 function Comm:SendHere()
@@ -150,18 +172,38 @@ function Comm:SendHere()
 		return
 	end
 
-	self:Send(MESSAGE_TYPES.HERE, Protocol.EncodePresence(MESSAGE_TYPES.HERE, Player.GetPresence()))
+	local presence = Player.GetPresence(self:GetHeartbeatInterval())
+
+	self:Send(MESSAGE_TYPES.HERE, Protocol.EncodePresence(MESSAGE_TYPES.HERE, presence))
 end
 
 function Comm:SendGoodbye()
 	self:Send(MESSAGE_TYPES.GOODBYE, Protocol.Encode(MESSAGE_TYPES.GOODBYE), "ALERT")
 end
 
--- Asks everyone to announce themselves. Rate limited so opening and closing
--- the window repeatedly does not spam the cluster. `force` bypasses the
--- cooldown (used right after joining the channel).
+-- True while our roster is too young for heartbeats to have filled it.
+function Comm:IsRosterYoung()
+	if not self.channelJoinedAt then
+		return false
+	end
+
+	return GetTime() - self.channelJoinedAt < Constants.WHO_ONLINE_WINDOW
+end
+
+-- True while HERE replies to our last request may still be arriving.
+function Comm:IsCollectingReplies()
+	return GetTime() - self.lastWhoOnlineAt < Constants.HERE_REPLY_MAX_JITTER
+end
+
+-- Asks everyone to announce themselves. Only sent while the roster is young
+-- (or when forced right after joining) and never more than once per
+-- cooldown, so window opens on a mature client cost the cluster nothing.
 function Comm:RequestRoster(force)
 	local now = GetTime()
+
+	if not force and not self:IsRosterYoung() then
+		return false
+	end
 
 	if not force and now - self.lastWhoOnlineAt < Constants.WHO_ONLINE_COOLDOWN then
 		return false
@@ -210,7 +252,8 @@ local function handlePresence(self, senderKey, message)
 		return
 	end
 
-	local changed = Sprout.roster:Upsert(senderKey, presence, GetTime())
+	local ttl = Constants.RosterTtl(presence.interval)
+	local changed = Sprout.roster:Upsert(senderKey, presence, GetTime(), ttl)
 
 	if changed then
 		self:SendMessage(EVENTS.ROSTER_UPDATED)
@@ -243,7 +286,7 @@ end
 -- Expiry ---------------------------------------------------------------------
 
 function Comm:SweepRoster()
-	local removed = Sprout.roster:ExpireOlderThan(GetTime() - Constants.ROSTER_EXPIRY)
+	local removed = Sprout.roster:Expire(GetTime())
 
 	if removed > 0 then
 		Sprout:Debug("expired %d roster entries", removed)

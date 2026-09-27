@@ -4,10 +4,10 @@ T.suite("Protocol")
 
 T.test("encodes a presence heartbeat deterministically", function(ns)
 	local text = ns.Protocol.EncodePresence("HB", {
-		role = "MENTOR", level = 42, class = "MAGE", zone = "Elwynn Forest", note = "PvP specialist",
+		role = "MENTOR", level = 42, class = "MAGE", zone = "Elwynn Forest", note = "PvP specialist", interval = 120,
 	})
 
-	T.equal(text, "1;HB;c=MAGE;l=42;n=PvP specialist;r=M;z=Elwynn Forest")
+	T.equal(text, "1;HB;c=MAGE;i=120;l=42;n=PvP specialist;r=M;z=Elwynn Forest")
 end)
 
 T.test("round-trips presence through decode", function(ns)
@@ -26,6 +26,25 @@ T.test("round-trips presence through decode", function(ns)
 	T.equal(presence.class, "WARRIOR")
 	T.equal(presence.zone, "Durotar")
 	T.equal(presence.note, "")
+	T.falsy(presence.interval, "interval absent when not sent")
+end)
+
+T.test("carries the sender's heartbeat interval", function(ns)
+	local text = ns.Protocol.EncodePresence("HB", { role = "MENTOR", level = 1, class = "MAGE", zone = "", interval = 360 })
+	local presence = ns.Protocol.PresenceFromFields(ns.Protocol.Decode(text).fields)
+
+	T.equal(presence.interval, 360)
+end)
+
+T.test("scales heartbeat interval and ttl with roster size", function(ns)
+	T.equal(ns.Constants.HeartbeatIntervalFor(0), 120)
+	T.equal(ns.Constants.HeartbeatIntervalFor(249), 120)
+	T.equal(ns.Constants.HeartbeatIntervalFor(250), 240)
+	T.equal(ns.Constants.HeartbeatIntervalFor(5000), ns.Constants.HEARTBEAT_INTERVAL_MAX)
+	T.equal(ns.Constants.RosterTtl(nil), 120 * 3 + 30)
+	T.equal(ns.Constants.RosterTtl(600), 600 * 3 + 30)
+	T.equal(ns.Constants.RosterTtl(5), 120 * 3 + 30, "too-small interval clamped up")
+	T.equal(ns.Constants.RosterTtl(999999), 600 * 3 + 30, "too-large interval clamped down")
 end)
 
 T.test("encodes bare messages without fields", function(ns)

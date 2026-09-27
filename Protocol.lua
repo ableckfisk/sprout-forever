@@ -26,6 +26,7 @@ local FIELD_KEYS = {
 	class = "c",
 	zone = "z",
 	note = "n",
+	interval = "i",
 }
 
 local ROLE_TO_WIRE = {
@@ -123,8 +124,8 @@ function Protocol.Encode(messageType, fields)
 end
 
 -- Encodes a presence announcement (heartbeat or HERE reply) from a presence
--- table { role, level, class, zone, note }. The note is shortened until the
--- whole message fits in a single addon message.
+-- table { role, level, class, zone, note, interval }. The note is shortened
+-- until the whole message fits in a single addon message.
 function Protocol.EncodePresence(messageType, presence)
 	local note = Protocol.SanitizeNote(presence.note or "")
 
@@ -135,6 +136,7 @@ function Protocol.EncodePresence(messageType, presence)
 			[FIELD_KEYS.class] = presence.class,
 			[FIELD_KEYS.zone] = presence.zone,
 			[FIELD_KEYS.note] = noteText,
+			[FIELD_KEYS.interval] = presence.interval,
 		})
 	end
 
@@ -152,6 +154,7 @@ function Protocol.EncodePresence(messageType, presence)
 			[FIELD_KEYS.role] = Protocol.RoleToWire(presence.role),
 			[FIELD_KEYS.level] = presence.level,
 			[FIELD_KEYS.class] = presence.class,
+			[FIELD_KEYS.interval] = presence.interval,
 		})
 	end
 
@@ -208,5 +211,8 @@ function Protocol.PresenceFromFields(fields)
 		class = fields[FIELD_KEYS.class] or "",
 		zone = fields[FIELD_KEYS.zone] or "",
 		note = fields[FIELD_KEYS.note] or "",
+		-- nil when the sender predates the field; the receiver falls back
+		-- to the base interval.
+		interval = tonumber(fields[FIELD_KEYS.interval]),
 	}
 end

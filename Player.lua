@@ -89,14 +89,16 @@ function Player.GetZone()
 	return mapInfo and mapInfo.name or ""
 end
 
--- Everything another client needs to list us in its roster.
-function Player.GetPresence()
+-- Everything another client needs to list us in its roster. `interval` is
+-- how often we currently heartbeat, so receivers know when to expire us.
+function Player.GetPresence(interval)
 	return {
 		role = Sprout:GetRole(),
 		level = Player.GetLevel(),
 		class = Player.GetClassToken(),
 		zone = Player.GetZone(),
 		note = Sprout:GetOwnNote(),
+		interval = interval,
 	}
 end
 
