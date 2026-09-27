@@ -1,0 +1,33 @@
+# Packages the addon with the BigWigs packager and uploads it to CurseForge,
+# Wago and GitHub Releases whenever a version tag (v1.2.3) is pushed.
+#
+# Required repository secrets:
+#   CF_API_KEY       CurseForge API token (needs X-Curse-Project-ID in the TOC)
+#   WAGO_API_TOKEN   Wago Addons API token (needs X-Wago-ID in the TOC)
+#   GITHUB_TOKEN is provided automatically.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Package and release
+        uses: BigWigsMods/packager@v2
+        env:
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
+          WAGO_API_TOKEN: ${{ secrets.WAGO_API_TOKEN }}
+          GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}

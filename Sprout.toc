@@ -1,0 +1,26 @@
+## Interface: 16001
+# ^ WoW Forever beta, confirmed 2026-09-27 via /run print(select(4, GetBuildInfo()))
+## Title: Sprout
+## Notes: Mentor and new-player matchmaking for WoW Forever. Flag yourself as a Sprout (looking for help) or a Mentor (offering help), see who else is online, and contact them directly.
+## Author: Mehrno <Renew>
+## Version: @project-version@
+## IconTexture: Interface\Icons\INV_Misc_Herb_Felweed
+## SavedVariables: SproutDB
+## X-Category: Chat & Communication
+## X-License: MIT
+## X-Website: https://github.com/oskarsahlstrom/sprouts-forever
+## X-Curse-Project-ID:
+## X-Wago-ID:
+
+embeds.xml
+
+Constants.lua
+Protocol.lua
+Roster.lua
+Core.lua
+Player.lua
+Channel.lua
+Comm.lua
+Options.lua
+UI\NoteDialog.lua
+UI\RosterWindow.lua

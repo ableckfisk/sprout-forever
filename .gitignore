@@ -1,0 +1,8 @@
+# Embedded libraries are pulled by the BigWigs packager (.pkgmeta externals).
+# Run scripts/fetch-libs.sh to populate this folder for local development.
+/libs/
+
+# BigWigs packager output
+/.release/
+
+.DS_Store
