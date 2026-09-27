@@ -56,6 +56,18 @@ local function buildOptionsTable()
 					Sprout:SetOwnNote(value)
 				end,
 			},
+			minimap = {
+				type = "toggle",
+				order = 25,
+				name = "Show minimap button",
+				desc = "Left-click the button to open the roster, right-click for settings.",
+				get = function()
+					return not Sprout.db.global.minimap.hide
+				end,
+				set = function(_, value)
+					Sprout:GetModule("MinimapButton"):SetShown(value)
+				end,
+			},
 			openRoster = {
 				type = "execute",
 				order = 30,

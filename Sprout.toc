@@ -22,5 +22,6 @@ Player.lua
 Channel.lua
 Comm.lua
 Options.lua
+MinimapButton.lua
 UI\NoteDialog.lua
 UI\RosterWindow.lua

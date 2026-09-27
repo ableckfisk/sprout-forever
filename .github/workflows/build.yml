@@ -1,15 +1,12 @@
-# Builds an installable addon package on every push so it can be downloaded
-# from the Actions tab without a WoW client on this machine.
+# Builds an installable package for every pull request so the change can be
+# tested in game before it is merged. Download it from the run's Artifacts.
 #
-# The BigWigs packager pulls Ace3 from .pkgmeta, so the artifact contains a
-# complete Sprout/ folder. Download it, unzip, and drop Sprout/ into
-# Interface/AddOns. No secrets are needed: nothing is uploaded anywhere.
+# The BigWigs packager pulls the libraries from .pkgmeta, so the artifact
+# contains a complete Sprout/ folder. No secrets are needed.
 name: Build
 
 on:
-  push:
-    branches:
-      - "**"
+  pull_request:
   workflow_dispatch:
 
 jobs:

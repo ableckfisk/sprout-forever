@@ -1,0 +1,73 @@
+# Every push to main becomes a release: this job creates the next version
+# tag and dispatches the Release workflow on it.
+#
+# Why two workflows: tags pushed with the built-in GITHUB_TOKEN do not
+# trigger other workflows, and the packager refuses to package a branch push
+# whose commit is already tagged. workflow_dispatch is the one trigger GitHub
+# still honours from GITHUB_TOKEN, so the tag is created here and the release
+# runs over there with the tag checked out.
+#
+# Version bump: patch by default. Put "#minor" or "#major" in the merge
+# commit message to bump those instead. Pushing a v* tag by hand skips this
+# job and goes straight to Release.
+name: Tag
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Determine next version
+        id: version
+        env:
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          set -euo pipefail
+
+          if git tag --points-at HEAD | grep -q '^v'; then
+            echo "Commit is already tagged, nothing to do."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          latest=$(git tag -l 'v*' --sort=-v:refname | head -n 1)
+          latest=${latest:-v0.0.0}
+          IFS=. read -r major minor patch <<< "${latest#v}"
+
+          case "$COMMIT_MESSAGE" in
+            *"#major"*) major=$((major + 1)); minor=0; patch=0 ;;
+            *"#minor"*) minor=$((minor + 1)); patch=0 ;;
+            *)          patch=$((patch + 1)) ;;
+          esac
+
+          next="v${major}.${minor}.${patch}"
+          echo "Previous: $latest, next: $next"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "tag=$next" >> "$GITHUB_OUTPUT"
+
+      - name: Create tag
+        if: steps.version.outputs.skip == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.version.outputs.tag }}" -m "Release ${{ steps.version.outputs.tag }}"
+          git push origin "${{ steps.version.outputs.tag }}"
+
+      - name: Dispatch release
+        if: steps.version.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run release.yml --ref "${{ steps.version.outputs.tag }}"

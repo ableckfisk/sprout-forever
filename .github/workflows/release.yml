@@ -1,10 +1,12 @@
-# Packages the addon with the BigWigs packager and uploads it to CurseForge,
-# Wago and GitHub Releases whenever a version tag (v1.2.3) is pushed.
+# Packages a tagged commit with the BigWigs packager and publishes it as a
+# GitHub Release. Runs when a v* tag is pushed by hand, or when the Tag
+# workflow dispatches it after a merge to main.
 #
-# Required repository secrets:
-#   CF_API_KEY       CurseForge API token (needs X-Curse-Project-ID in the TOC)
-#   WAGO_API_TOKEN   Wago Addons API token (needs X-Wago-ID in the TOC)
-#   GITHUB_TOKEN is provided automatically.
+# CurseForge and Wago uploads switch on automatically once these repository
+# secrets exist and the matching X-Curse-Project-ID / X-Wago-ID fields are
+# filled in Sprout.toc:
+#   CF_API_KEY       CurseForge API token
+#   WAGO_API_TOKEN   Wago Addons API token
 name: Release
 
 on:

@@ -51,6 +51,9 @@ ns.Constants = {
 	MAX_NOTE_LENGTH = 80,
 	MAX_ADDON_MESSAGE_LENGTH = 255,
 
+	-- Minimap button texture. Any leaf-like icon from the client works here.
+	MINIMAP_ICON = "Interface\\Icons\\INV_Misc_Herb_Felweed",
+
 	ROLES = {
 		OFF = "OFF",
 		SPROUT = "SPROUT",

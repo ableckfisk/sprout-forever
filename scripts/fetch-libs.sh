@@ -37,4 +37,20 @@ for library in "${LIBRARIES[@]}"; do
   echo "  vendored $library"
 done
 
+# Minimap button libraries (not part of Ace3).
+echo "Fetching LibDataBroker-1.1..."
+git clone --quiet --depth 1 https://github.com/tekkub/libdatabroker-1-1.git "$WORK_DIR/ldb"
+rm -rf "$LIBS_DIR/LibDataBroker-1.1"
+mkdir -p "$LIBS_DIR/LibDataBroker-1.1"
+cp "$WORK_DIR/ldb/LibDataBroker-1.1.lua" "$LIBS_DIR/LibDataBroker-1.1/"
+echo "  vendored LibDataBroker-1.1"
+
+echo "Fetching LibDBIcon-1.0..."
+LIBDBICON_URL="https://repos.wowace.com/wow/libdbicon-1-0/trunk/LibDBIcon-1.0"
+rm -rf "$LIBS_DIR/LibDBIcon-1.0"
+mkdir -p "$LIBS_DIR/LibDBIcon-1.0"
+curl -sSf "$LIBDBICON_URL/LibDBIcon-1.0.lua" -o "$LIBS_DIR/LibDBIcon-1.0/LibDBIcon-1.0.lua"
+curl -sSf "$LIBDBICON_URL/lib.xml" -o "$LIBS_DIR/LibDBIcon-1.0/lib.xml"
+echo "  vendored LibDBIcon-1.0"
+
 echo "Done. Libraries are in $LIBS_DIR"

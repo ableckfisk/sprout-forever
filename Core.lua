@@ -25,6 +25,8 @@ local DB_DEFAULTS = {
 		playerNotes = {},
 		windowStatus = {},
 		sortKey = "name",
+		-- LibDBIcon stores position and visibility in this table.
+		minimap = { hide = false },
 		debug = false,
 	},
 }

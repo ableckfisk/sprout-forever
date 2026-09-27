@@ -16,7 +16,8 @@ whisper or invite them from a roster window.
 | `/sprout status` | Show channel and roster status |
 | `/sprout debug` | Toggle protocol logging in the chat frame |
 
-The roster window has two boxes, Sprouts and Mentors. Each row shows name,
+A minimap button opens the roster on left-click and settings on right-click;
+it can be hidden in settings. The roster window has two boxes, Sprouts and Mentors. Each row shows name,
 level, class and zone. Left-click a row to whisper; right-click for Whisper,
 Invite to party and Add/Edit private note. Hovering a row shows the player's
 note and your own private note about them. Private notes are account-wide;
@@ -75,6 +76,7 @@ Player.lua         live character info (name-realm, level, class, zone)
 Channel.lua        hidden channel join/rejoin/health check
 Comm.lua           heartbeat, WHO/HERE/BYE, roster expiry
 Options.lua        AceConfig settings panel
+MinimapButton.lua  LibDBIcon minimap button
 UI/RosterWindow.lua  two-box roster window (AceGUI chrome, virtualized row lists)
 UI/NoteDialog.lua    private note editor
 libs/              Ace3 (gitignored, see below)
@@ -125,19 +127,22 @@ end-to-end. `/sprout debug` prints every message sent and received.
   addons lose settings too before debugging Sprout.
 - `WOW_PROJECT_ID` reports as Retail; the addon does not branch on it.
 
-## Getting a build
+## Builds and releases
 
-Every push runs `.github/workflows/build.yml`, which packages the addon with
-Ace3 included and attaches it as an artifact. On GitHub open the Actions tab,
-pick the latest Build run, download `Sprout` under Artifacts, unzip it and
-copy the `Sprout/` folder into `Interface/AddOns`. Artifacts are kept for
-30 days.
+All packaging uses the [BigWigs packager](https://github.com/BigWigsMods/packager),
+which pulls the libraries from `.pkgmeta`, replaces `@project-version@` in
+the TOC and writes release notes from the commit messages since the previous
+tag.
 
-## Releasing
-
-Releases are built by the [BigWigs packager](https://github.com/BigWigsMods/packager)
-via `.github/workflows/release.yml` when a `v*` tag is pushed. It pulls Ace3
-from `.pkgmeta`, replaces `@project-version@` in the TOC, and uploads to
-CurseForge and Wago when `CF_API_KEY` / `WAGO_API_TOKEN` secrets and the
-`X-Curse-Project-ID` / `X-Wago-ID` TOC fields are set. `CHANGELOG.md` is
-used as the release notes.
+- **Pull requests** run `build.yml`. Open the Actions tab, pick the Build run
+  for your PR and download `Sprout` under Artifacts. Unzip it and copy the
+  `Sprout/` folder into `Interface/AddOns`. Artifacts are kept for 30 days.
+- **Merges to main** run `tag.yml`, which creates the next `vX.Y.Z` tag
+  (patch bump by default; put `#minor` or `#major` in the merge commit
+  message for a bigger bump) and dispatches `release.yml` on it. That
+  publishes a GitHub Release with the zip attached.
+- **Manual tags** (`git tag v1.2.0 && git push origin v1.2.0`) run
+  `release.yml` directly and are skipped by `tag.yml`.
+- **CurseForge and Wago** uploads switch on once the `CF_API_KEY` and
+  `WAGO_API_TOKEN` repository secrets exist and `X-Curse-Project-ID` /
+  `X-Wago-ID` are filled in `Sprout.toc`.
