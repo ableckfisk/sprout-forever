@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -29,9 +29,12 @@ jobs:
           args: -d -z
 
       - name: Upload package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: Sprout
           path: .release/
+          # The packager writes to a dot-folder, which upload-artifact skips
+          # unless told otherwise.
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 30
