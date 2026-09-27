@@ -1,6 +1,6 @@
 -- The two-box roster window: online Sprouts on the left, Mentors on the
--- right. Each row shows name, level, class and zone with whisper, invite
--- and note actions.
+-- right. Each row shows name, level, class and zone. Left-click whispers,
+-- right-click opens a context menu with whisper, invite and note actions.
 --
 -- AceGUI widgets are pooled; ReleaseChildren() returns a container's widgets
 -- to the pool, so a refresh is "release everything, rebuild from the roster".
@@ -17,18 +17,15 @@ local RosterWindow = Sprout:NewModule("RosterWindow", "AceEvent-3.0", "AceTimer-
 local EVENTS = Constants.EVENTS
 local ROLES = Constants.ROLES
 
-local WINDOW_WIDTH = 1080
+local WINDOW_WIDTH = 1040
 local WINDOW_HEIGHT = 560
 local REFRESH_DEBOUNCE = 0.2
 
 local COLUMN_WIDTHS = {
-	name = 130,
-	level = 34,
-	class = 80,
-	zone = 110,
-	whisper = 68,
-	invite = 60,
-	note = 54,
+	name = 190,
+	level = 40,
+	class = 90,
+	zone = 150,
 }
 
 local SORT_OPTIONS = {
@@ -235,7 +232,7 @@ function RosterWindow:BuildStatusText(counts)
 		roleText = roleText .. " (browsing only, others cannot see you)"
 	end
 
-	return string.format("%s. %d sprouts and %d mentors online on your realm cluster.",
+	return string.format("%s. %d sprouts and %d mentors online. Left-click a row to whisper, right-click for options.",
 		roleText, counts[ROLES.SPROUT] or 0, counts[ROLES.MENTOR] or 0)
 end
 
@@ -260,23 +257,21 @@ end
 
 -- Rows -----------------------------------------------------------------------
 
-local function addTextColumn(row, text, width)
-	local label = AceGUI:Create("Label")
-	label:SetText(text)
-	label:SetWidth(width)
-	row:AddChild(label)
+local ROW_HIGHLIGHT = "Interface\\QuestFrame\\UI-QuestTitleHighlight"
 
-	return label
-end
+-- Every cell is an InteractiveLabel wired to the same handlers, so the whole
+-- row reacts to hover and clicks even though AceGUI has no row widget.
+local function addCell(row, text, width, handlers)
+	local cell = AceGUI:Create("InteractiveLabel")
+	cell:SetText(text)
+	cell:SetWidth(width)
+	cell:SetHighlight(ROW_HIGHLIGHT)
+	cell:SetCallback("OnEnter", handlers.onEnter)
+	cell:SetCallback("OnLeave", handlers.onLeave)
+	cell:SetCallback("OnClick", handlers.onClick)
+	row:AddChild(cell)
 
-local function addButton(row, text, width, onClick)
-	local button = AceGUI:Create("Button")
-	button:SetText(text)
-	button:SetWidth(width)
-	button:SetCallback("OnClick", onClick)
-	row:AddChild(button)
-
-	return button
+	return cell
 end
 
 function RosterWindow:BuildRow(entry)
@@ -291,43 +286,63 @@ function RosterWindow:BuildRow(entry)
 		displayName = displayName .. " |cffffd100*|r"
 	end
 
-	local nameLabel = AceGUI:Create("InteractiveLabel")
-	nameLabel:SetText(displayName)
-	nameLabel:SetWidth(COLUMN_WIDTHS.name)
-	nameLabel:SetHighlight("Interface\\QuestFrame\\UI-QuestTitleHighlight")
-	nameLabel:SetCallback("OnEnter", function(widget)
-		self:ShowTooltip(widget, entry, privateNote)
-	end)
-	nameLabel:SetCallback("OnLeave", function()
-		GameTooltip:Hide()
-	end)
-	nameLabel:SetCallback("OnClick", function()
-		self:Whisper(entry)
-	end)
-	row:AddChild(nameLabel)
+	local handlers = {
+		onEnter = function(widget)
+			self:ShowTooltip(widget, entry, privateNote)
+		end,
+		onLeave = function()
+			GameTooltip:Hide()
+		end,
+		onClick = function(widget, _, button)
+			if button == "RightButton" then
+				self:OpenContextMenu(widget, entry, privateNote)
+			else
+				self:Whisper(entry)
+			end
+		end,
+	}
 
-	addTextColumn(row, tostring(entry.level), COLUMN_WIDTHS.level)
-	addTextColumn(row, Player.ColorizeByClass(Player.GetClassName(entry.class), entry.class), COLUMN_WIDTHS.class)
-	addTextColumn(row, entry.zone, COLUMN_WIDTHS.zone)
-
-	addButton(row, "Whisper", COLUMN_WIDTHS.whisper, function()
-		self:Whisper(entry)
-	end)
-	addButton(row, "Invite", COLUMN_WIDTHS.invite, function()
-		self:Invite(entry)
-	end)
-	addButton(row, "Note", COLUMN_WIDTHS.note, function()
-		Sprout:GetModule("NoteDialog"):Open(entry.key)
-	end)
+	addCell(row, displayName, COLUMN_WIDTHS.name, handlers)
+	addCell(row, tostring(entry.level), COLUMN_WIDTHS.level, handlers)
+	addCell(row, Player.ColorizeByClass(Player.GetClassName(entry.class), entry.class), COLUMN_WIDTHS.class, handlers)
+	addCell(row, entry.zone, COLUMN_WIDTHS.zone, handlers)
 
 	return row
+end
+
+-- Context menu built with the client's MenuUtil API (the same system the
+-- unit frame right-click menu uses on 11.0+ clients).
+function RosterWindow:OpenContextMenu(widget, entry, privateNote)
+	GameTooltip:Hide()
+
+	if not (MenuUtil and MenuUtil.CreateContextMenu) then
+		Sprout:Print("Context menus are not available on this client. Left-click to whisper.")
+		return
+	end
+
+	MenuUtil.CreateContextMenu(widget.frame, function(_, rootDescription)
+		rootDescription:CreateTitle(entry.key)
+		rootDescription:CreateButton("Whisper", function()
+			self:Whisper(entry)
+		end)
+		rootDescription:CreateButton("Invite to party", function()
+			self:Invite(entry)
+		end)
+		rootDescription:CreateDivider()
+		rootDescription:CreateButton(privateNote and "Edit private note" or "Add private note", function()
+			Sprout:GetModule("NoteDialog"):Open(entry.key)
+		end)
+	end)
 end
 
 function RosterWindow:ShowTooltip(widget, entry, privateNote)
 	GameTooltip:SetOwner(widget.frame, "ANCHOR_RIGHT")
 	GameTooltip:ClearLines()
 	GameTooltip:AddLine(Player.ColorizeByClass(entry.name, entry.class))
-	GameTooltip:AddLine(entry.realm or "", 0.8, 0.8, 0.8)
+
+	if entry.realm then
+		GameTooltip:AddLine(entry.realm, 0.8, 0.8, 0.8)
+	end
 	GameTooltip:AddLine(string.format("Level %d %s", entry.level, Player.GetClassName(entry.class)), 1, 1, 1)
 	GameTooltip:AddLine(entry.zone, 1, 1, 1)
 
@@ -344,15 +359,21 @@ function RosterWindow:ShowTooltip(widget, entry, privateNote)
 	end
 
 	GameTooltip:AddLine(" ")
-	GameTooltip:AddLine("Click to whisper", 0.6, 0.6, 0.6)
+	GameTooltip:AddLine("Left-click to whisper, right-click for options", 0.6, 0.6, 0.6)
 	GameTooltip:Show()
 end
 
 -- Actions --------------------------------------------------------------------
 
--- Opens the chat edit box with "/w Name-Realm " prefilled, the same thing
--- clicking a name in chat does.
+-- Opens the chat edit box in whisper mode for the player, the same thing
+-- clicking a name in chat does. ChatFrame_SendTell knows how to format
+-- names with spaces (Forever surnames) or realm suffixes.
 function RosterWindow:Whisper(entry)
+	if ChatFrame_SendTell then
+		ChatFrame_SendTell(entry.key)
+		return
+	end
+
 	ChatFrame_OpenChat("/w " .. entry.key .. " ")
 end
 

@@ -17,9 +17,13 @@ whisper or invite them from a roster window.
 | `/sprout debug` | Toggle protocol logging in the chat frame |
 
 The roster window has two boxes, Sprouts and Mentors. Each row shows name,
-level, class and zone, with Whisper, Invite and Note buttons. Hovering a name
-shows the player's note and your own private note about them. Private notes
-are account-wide; role and own note are per character.
+level, class and zone. Left-click a row to whisper; right-click for Whisper,
+Invite to party and Add/Edit private note. Hovering a row shows the player's
+note and your own private note about them. Private notes are account-wide;
+role and own note are per character.
+
+Players are identified by their Forever name, "First Surname". There are no
+realms on Forever; any `-Realm` suffix the client attaches is ignored.
 
 Scope: discovery runs over a hidden custom chat channel, so it reaches your
 connected-realm cluster and faction, not the whole game.

@@ -14,7 +14,8 @@ function Roster.New()
 	return setmetatable({ entries = {} }, Roster)
 end
 
--- Splits "Name-Realm" into its parts. Realm is nil when absent.
+-- Splits "Name-Realm" into its parts. Realm is nil when absent, which is
+-- always the case on WoW Forever where keys are "First Surname".
 function Roster.SplitKey(key)
 	local name, realm = key:match("^([^%-]+)%-(.+)$")
 

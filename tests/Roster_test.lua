@@ -20,6 +20,11 @@ T.test("splits Name-Realm keys", function(ns)
 	local bareName, noRealm = ns.Roster.SplitKey("Frostina")
 	T.equal(bareName, "Frostina")
 	T.falsy(noRealm)
+
+	-- WoW Forever keys are "First Surname" with no realm.
+	local foreverName, foreverRealm = ns.Roster.SplitKey("Mehrno Onrhem")
+	T.equal(foreverName, "Mehrno Onrhem")
+	T.falsy(foreverRealm)
 end)
 
 T.test("reports changes only when visible fields differ", function(ns)
